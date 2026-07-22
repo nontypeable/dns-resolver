@@ -1,5 +1,24 @@
 package dns
 
+// RCODE values (RFC 1035, Section 4.1.1)
+const (
+	RCodeNoError  uint8 = 0
+	RCodeFormErr  uint8 = 1
+	RCodeServFail uint8 = 2
+	RCodeNXDomain uint8 = 3
+	RCodeNotImp   uint8 = 4
+	RCodeRefused  uint8 = 5
+)
+
+// OPCODE values (RFC 1035, Section 4.1.1)
+const (
+	OpcodeQuery  uint8 = 0
+	OpcodeIQuery uint8 = 1
+	OpcodeStatus uint8 = 2
+	OpcodeNotify uint8 = 4
+	OpcodeUpdate uint8 = 5
+)
+
 // Header is the first 12 bytes of any DNS message (query or response).
 //
 // Reference: RFC 1035, Section 4.1.1 (Header section format)
@@ -49,9 +68,17 @@ type Header struct {
 	ArCount uint16
 }
 
+func (h Header) Encode() []byte {
+	return []byte{}
+}
+
+func (h *Header) Decode(data []byte) error {
+	return nil
+}
+
 // Flags is the unpacked representation of the 16-bit flags field in Header.
 // Each bit (or group of bits) controls DNS protocol behavior.
-// Use Pack() to serialize into a uint16, and UnpackFlags() to parse one back.
+// Use Pack() to serialize into a uint16, and Unpack() to parse one back.
 //
 // Bit layout (RFC 1035, Section 4.1.1):
 //
@@ -67,7 +94,7 @@ type Flags struct {
 	// QR (1 bit) — Query/Response.
 	// 0 = this message is a query.
 	// 1 = this message is a response.
-	QR uint16
+	QR bool
 
 	// OPCODE (4 bits) — type of operation.
 	// 0 = QUERY (standard query, used in 95% of cases).
@@ -75,7 +102,7 @@ type Flags struct {
 	// 2 = STATUS (server status request).
 	// 4 = NOTIFY (zone change notification).
 	// 5 = UPDATE (dynamic zone update).
-	OPCODE uint16
+	OPCODE uint8
 
 	// AA (1 bit) — Authoritative Answer.
 	//
@@ -86,12 +113,12 @@ type Flags struct {
 	//
 	// The resolver uses this bit to decide whether the answer is final
 	// and can be cached, or whether it should continue iterating down the DNS tree.
-	AA uint16
+	AA bool
 
 	// TC (1 bit) — Truncation.
 	// 1 = the response was too large to fit in a UDP packet and was truncated.
 	// The resolver MUST re-issue the query over TCP to get the full response.
-	TC uint16
+	TC bool
 
 	// RD (1 bit) — Recursion Desired.
 	// Set by the client in a query:
@@ -100,7 +127,7 @@ type Flags struct {
 	//
 	// A resolver sets RD=0 when querying root/TLD/authoritative servers
 	// (it performs recursion itself). A stub client (e.g. a browser) sets RD=1.
-	RD uint16
+	RD bool
 
 	// RA (1 bit) — Recursion Available.
 	// Set by the server in a response:
@@ -109,11 +136,11 @@ type Flags struct {
 	//
 	// Root and TLD servers return RA=0 (they only give referrals).
 	// Recursive resolvers (8.8.8.8, 1.1.1.1) return RA=1.
-	RA uint16
+	RA bool
 
 	// Z (3 bits) — Reserved.
 	// Must be 0 per RFC 1035.
-	Z uint16
+	Z uint8
 
 	// RCODE (4 bits) — Response code.
 	// 0 = NOERROR (success, or NODATA if Answer is empty).
@@ -122,5 +149,11 @@ type Flags struct {
 	// 3 = NXDOMAIN (the domain does not exist).
 	// 4 = NOTIMP (server does not support this type of query).
 	// 5 = REFUSED (server refused to answer, e.g. due to policy).
-	RCODE uint16
+	RCODE uint8
 }
+
+func (f Flags) Encode() uint16 {
+	return 0
+}
+
+func (f *Flags) Decode(flags uint16) {}
