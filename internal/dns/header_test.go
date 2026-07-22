@@ -136,3 +136,226 @@ func TestFlagsRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestHeaderEncode_Basic(t *testing.T) {
+	tests := []struct {
+		name   string
+		header Header
+		want   []byte
+	}{
+		{
+			name:   "empty header",
+			header: Header{},
+			want:   []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "simple query with RD=1",
+			header: Header{
+				ID:      0xABCD,
+				Flags:   0b0000_0001_0000_0000,
+				QdCount: 1,
+			},
+			want: []byte{0xAB, 0xCD, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "resolver response with 1 answer",
+			header: Header{
+				ID:      0xABCD,
+				Flags:   0x8180,
+				QdCount: 1,
+				AnCount: 1,
+			},
+			want: []byte{0xAB, 0xCD, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "authoritative response",
+			header: Header{
+				ID:      0x1234,
+				Flags:   0x8400,
+				QdCount: 1,
+				AnCount: 2,
+			},
+			want: []byte{0x12, 0x34, 0x84, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "referral with 13 NS and 13 Additional",
+			header: Header{
+				ID:      0xFFFF,
+				Flags:   0x8000,
+				QdCount: 1,
+				NsCount: 13,
+				ArCount: 13,
+			},
+			want: []byte{0xFF, 0xFF, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x00, 0x0D},
+		},
+		{
+			name: "NXDOMAIN with SOA in Authority",
+			header: Header{
+				ID:      0x0001,
+				Flags:   0x8183,
+				QdCount: 1,
+				NsCount: 1,
+			},
+			want: []byte{0x00, 0x01, 0x81, 0x83, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00},
+		},
+		{
+			name: "truncated response",
+			header: Header{
+				ID:      0x5678,
+				Flags:   0x8280,
+				QdCount: 1,
+			},
+			want: []byte{0x56, 0x78, 0x82, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "max values",
+			header: Header{
+				ID:      0xFFFF,
+				Flags:   0xFFFF,
+				QdCount: 0xFFFF,
+				AnCount: 0xFFFF,
+				NsCount: 0xFFFF,
+				ArCount: 0xFFFF,
+			},
+			want: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.header.Encode()
+			assert.Equal(t, tt.want, got, "Encode() should produce expected 12 bytes")
+		})
+	}
+}
+
+func TestHeaderDecode_Basic(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want Header
+	}{
+		{
+			name: "empty header",
+			data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			want: Header{},
+		},
+		{
+			name: "simple query",
+			data: []byte{0xAB, 0xCD, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			want: Header{
+				ID:      0xABCD,
+				Flags:   0x0100,
+				QdCount: 1,
+			},
+		},
+		{
+			name: "resolver response with answers",
+			data: []byte{0xAB, 0xCD, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00},
+			want: Header{
+				ID:      0xABCD,
+				Flags:   0x8180,
+				QdCount: 1,
+				AnCount: 1,
+			},
+		},
+		{
+			name: "referral",
+			data: []byte{0xFF, 0xFF, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x00, 0x0D},
+			want: Header{
+				ID:      0xFFFF,
+				Flags:   0x8000,
+				QdCount: 1,
+				NsCount: 13,
+				ArCount: 13,
+			},
+		},
+		{
+			name: "NXDOMAIN",
+			data: []byte{0x00, 0x01, 0x81, 0x83, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00},
+			want: Header{
+				ID:      0x0001,
+				Flags:   0x8183,
+				QdCount: 1,
+				NsCount: 1,
+			},
+		},
+		{
+			name: "max values",
+			data: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+			want: Header{
+				ID:      0xFFFF,
+				Flags:   0xFFFF,
+				QdCount: 0xFFFF,
+				AnCount: 0xFFFF,
+				NsCount: 0xFFFF,
+				ArCount: 0xFFFF,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got Header
+			err := got.Decode(tt.data)
+			assert.NoError(t, err, "Decode() should not return error for valid data")
+			assert.Equal(t, tt.want, got, "Decode() should produce expected header")
+		})
+	}
+}
+
+func TestHeaderDecode_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr bool
+	}{
+		{"empty slice", []byte{}, true},
+		{"1 byte", []byte{0x00}, true},
+		{"5 bytes", []byte{0x00, 0x01, 0x02, 0x03, 0x04}, true},
+		{"11 bytes — one short", []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A}, true},
+		{"12 bytes — valid", []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B}, false},
+		{"13 bytes — extra data is ok", []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0xFF}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got Header
+			err := got.Decode(tt.data)
+			if tt.wantErr {
+				assert.Error(t, err, "Decode() should return error for insufficient data")
+			} else {
+				assert.NoError(t, err, "Decode() should not return error for valid data")
+			}
+		})
+	}
+}
+
+func TestHeaderRoundTrip(t *testing.T) {
+	tests := []struct {
+		name   string
+		header Header
+	}{
+		{"empty", Header{}},
+		{"simple query", Header{ID: 0xABCD, Flags: 0x0100, QdCount: 1}},
+		{"resolver response", Header{ID: 0xABCD, Flags: 0x8180, QdCount: 1, AnCount: 1}},
+		{"authoritative", Header{ID: 0x1234, Flags: 0x8400, QdCount: 1, AnCount: 2}},
+		{"referral", Header{ID: 0xFFFF, Flags: 0x8000, QdCount: 1, NsCount: 13, ArCount: 13}},
+		{"NXDOMAIN", Header{ID: 0x0001, Flags: 0x8183, QdCount: 1, NsCount: 1}},
+		{"truncated", Header{ID: 0x5678, Flags: 0x8280, QdCount: 1}},
+		{"max values", Header{ID: 0xFFFF, Flags: 0xFFFF, QdCount: 0xFFFF, AnCount: 0xFFFF, NsCount: 0xFFFF, ArCount: 0xFFFF}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded := tt.header.Encode()
+			assert.Len(t, encoded, 12, "Encode() should always produce 12 bytes")
+
+			var decoded Header
+			err := decoded.Decode(encoded)
+			assert.NoError(t, err, "Decode() should not fail on encoded data")
+
+			assert.Equal(t, tt.header, decoded, "round trip Encode → Decode should preserve all fields")
+		})
+	}
+}
