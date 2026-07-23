@@ -1,5 +1,9 @@
 package dns
 
+import (
+	"strings"
+)
+
 // QTYPE values — type of the requested resource record (RFC 1035, Section 3.2.2).
 //
 // The most common types a resolver deals with:
@@ -100,7 +104,33 @@ func (q *Question) Decode(data []byte, offset int) (int, error) {
 }
 
 func encodeName(name string) ([]byte, error) {
-	return nil, nil
+	name = strings.TrimSuffix(name, ".")
+	if name == "" {
+		return []byte{0x0}, nil
+	}
+
+	result := make([]byte, 0, len(name)+1)
+	s := strings.Split(name, ".")
+
+	for _, v := range s {
+		if v == "" {
+			return nil, ErrEmptyLabel
+		}
+		if len(v) > 63 {
+			return nil, ErrLabelTooLong
+		}
+
+		result = append(result, byte(len(v)))
+		result = append(result, []byte(v)...)
+	}
+
+	result = append(result, 0x0)
+
+	if len(result) > 255 {
+		return nil, ErrNameTooLong
+	}
+
+	return result, nil
 }
 
 func decodeName(data []byte, offset int) (name string, newOffset int, err error) {
