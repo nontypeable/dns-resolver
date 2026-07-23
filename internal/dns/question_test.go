@@ -42,11 +42,9 @@ func TestNameEncode_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := make([]byte, 0, 256)
-			off, err := encodeName(buf, 0, tt.in)
+			got, err := encodeName(tt.in)
 			assert.NoError(t, err, "encodeName should not fail for valid name")
-			assert.Equal(t, len(tt.want), off, "offset should advance by the wire length")
-			assert.Equal(t, tt.want, buf, "encodeName should produce expected wire bytes")
+			assert.Equal(t, tt.want, got, "encodeName should produce expected wire bytes")
 		})
 	}
 }
@@ -65,8 +63,7 @@ func TestNameEncode_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := make([]byte, 0, 512)
-			_, err := encodeName(buf, 0, tt.in)
+			_, err := encodeName(tt.in)
 			assert.Error(t, err, "encodeName should fail for invalid name")
 			assert.True(t, errors.Is(err, tt.wantErr),
 				"encodeName error = %v, want %v", err, tt.wantErr)
@@ -157,12 +154,11 @@ func TestNameRoundTrip(t *testing.T) {
 	}
 	for _, n := range names {
 		t.Run(n, func(t *testing.T) {
-			buf := make([]byte, 0, 256)
-			off, err := encodeName(buf, 0, n)
+			wire, err := encodeName(n)
 			assert.NoError(t, err)
-			got, n2, err := decodeName(buf, 0)
+			got, n2, err := decodeName(wire, 0)
 			assert.NoError(t, err)
-			assert.Equal(t, off, n2, "decode offset should match encode offset")
+			assert.Equal(t, len(wire), n2, "decode offset should match encode length")
 			assert.Equal(t, n, got, "round trip encode → decode should preserve the name")
 		})
 	}
@@ -215,11 +211,9 @@ func TestQuestionEncode_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := make([]byte, 0, 512)
-			off, err := tt.question.Encode(buf, 0)
+			got, err := tt.question.Encode()
 			assert.NoError(t, err, "Encode should not fail for valid question")
-			assert.Equal(t, len(tt.want), off, "offset should advance by the encoded length")
-			assert.Equal(t, tt.want, buf, "Encode should produce expected wire bytes")
+			assert.Equal(t, tt.want, got, "Encode should produce expected wire bytes")
 		})
 	}
 }
@@ -237,8 +231,7 @@ func TestQuestionEncode_NameErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := make([]byte, 0, 512)
-			_, err := tt.question.Encode(buf, 0)
+			_, err := tt.question.Encode()
 			assert.Error(t, err, "Encode should fail for malformed name")
 			assert.True(t, errors.Is(err, tt.wantErr),
 				"Encode error = %v, want %v", err, tt.wantErr)
@@ -336,14 +329,13 @@ func TestQuestionRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := make([]byte, 0, 512)
-			off, err := tt.question.Encode(buf, 0)
+			wire, err := tt.question.Encode()
 			assert.NoError(t, err, "Encode should not fail")
 
 			var decoded Question
-			n, err := decoded.Decode(buf, 0)
+			n, err := decoded.Decode(wire, 0)
 			assert.NoError(t, err, "Decode should not fail on encoded data")
-			assert.Equal(t, off, n, "Decode offset should match Encode offset")
+			assert.Equal(t, len(wire), n, "Decode offset should match Encode length")
 			assert.Equal(t, tt.question, decoded, "round trip Encode → Decode should preserve all fields")
 		})
 	}

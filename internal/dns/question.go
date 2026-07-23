@@ -91,16 +91,16 @@ type Question struct {
 	Class uint16
 }
 
-func (q Question) Encode(buf []byte, offset int) (int, error) {
-	return offset, nil
+func (q Question) Encode() ([]byte, error) {
+	return nil, nil
 }
 
 func (q *Question) Decode(data []byte, offset int) (int, error) {
 	return offset, nil
 }
 
-func encodeName(buf []byte, offset int, name string) (int, error) {
-	return offset, nil
+func encodeName(name string) ([]byte, error) {
+	return nil, nil
 }
 
 func decodeName(data []byte, offset int) (name string, newOffset int, err error) {
