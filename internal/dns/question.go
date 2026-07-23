@@ -1,6 +1,8 @@
 package dns
 
 import (
+	"encoding/binary"
+	"log"
 	"strings"
 )
 
@@ -96,11 +98,44 @@ type Question struct {
 }
 
 func (q Question) Encode() ([]byte, error) {
-	return nil, nil
+	encodedName, err := encodeName(q.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]byte, 4+len(encodedName))
+	log.Printf("result: %+v", result)
+
+	copy(result[0:len(encodedName)], encodedName)
+	log.Printf("result: %+v", result)
+
+	binary.Encode(result[len(encodedName):], binary.BigEndian, ([]uint16{q.Type, q.Class}))
+
+	return result, nil
 }
 
 func (q *Question) Decode(data []byte, offset int) (int, error) {
-	return offset, nil
+	name, newOffset, err := decodeName(data, offset)
+	if err != nil {
+		return 0, err
+	}
+
+	if newOffset+2+2 > len(data) {
+		return 0, ErrQuestionTooShort
+	}
+
+	q.Name = name
+	_, err = binary.Decode(data[newOffset:newOffset+2], binary.BigEndian, &q.Type)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = binary.Decode(data[newOffset+2:newOffset+4], binary.BigEndian, &q.Class)
+	if err != nil {
+		return 0, err
+	}
+
+	return newOffset + 4, nil
 }
 
 func encodeName(name string) ([]byte, error) {
@@ -135,6 +170,10 @@ func encodeName(name string) ([]byte, error) {
 
 // TODO: refactor this function
 func decodeName(data []byte, offset int) (name string, newOffset int, err error) {
+	if len(data) == 0 {
+		return "", 0, ErrNameTruncated
+	}
+
 	pos := offset
 
 	r := make([]string, 0)
