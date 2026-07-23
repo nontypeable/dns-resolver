@@ -1,8 +1,6 @@
 package dns
 
-import (
-	"encoding/binary"
-)
+import "encoding/binary"
 
 // RCODE values (RFC 1035, Section 4.1.1)
 const (
@@ -213,12 +211,12 @@ func (f Flags) Encode() uint16 {
 }
 
 func (f *Flags) Decode(flags uint16) {
-	f.QR = (flags&uint16(1<<15))>>15 != 0
-	f.OPCODE = uint8((flags & uint16(15<<11)) >> 11)
-	f.AA = (flags & uint16(1<<10) >> 10) != 0
-	f.TC = (flags & uint16(1<<9) >> 9) != 0
-	f.RD = (flags & uint16(1<<8) >> 8) != 0
-	f.RA = (flags & uint16(1<<7) >> 7) != 0
-	f.Z = uint8(flags & uint16(7<<4) >> 4)
-	f.RCODE = uint8(flags & uint16(15))
+	f.QR = ((flags >> 15) & 1) != 0
+	f.OPCODE = uint8((flags >> 11) & 0xF)
+	f.AA = ((flags >> 10) & 1) != 0
+	f.TC = ((flags >> 9) & 1) != 0
+	f.RD = ((flags >> 8) & 1) != 0
+	f.RA = ((flags >> 7) & 1) != 0
+	f.Z = uint8((flags >> 4) & 7)
+	f.RCODE = uint8(flags & 0xF)
 }
