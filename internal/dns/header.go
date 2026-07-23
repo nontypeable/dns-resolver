@@ -1,5 +1,9 @@
 package dns
 
+import (
+	"encoding/binary"
+)
+
 // RCODE values (RFC 1035, Section 4.1.1)
 const (
 	RCodeNoError  uint8 = 0
@@ -21,6 +25,24 @@ const (
 
 // Header is the first 12 bytes of any DNS message (query or response).
 //
+// Bit layout (RFC 1035, Section 4.1.1):
+//
+//	                                1  1  1  1  1  1
+//	  0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|                      ID                       |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|                    QDCOUNT                    |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|                    ANCOUNT                    |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|                    NSCOUNT                    |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|                    ARCOUNT                    |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//
 // Reference: RFC 1035, Section 4.1.1 (Header section format)
 // https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1
 type Header struct {
@@ -32,7 +54,7 @@ type Header struct {
 	ID uint16
 
 	// Flags is a 16-bit field packed with control flags and the response code.
-	// See the Flags type and its Pack/Unpack methods for working with individual bits.
+	// See the Flags type and its Encode/Decode methods for working with individual bits.
 	Flags uint16
 
 	// QdCount is the number of entries in the Question section.
@@ -69,26 +91,38 @@ type Header struct {
 }
 
 func (h Header) Encode() []byte {
-	return []byte{}
+	buf := make([]byte, 12)
+	binary.Encode(buf, binary.BigEndian, h)
+	return buf
 }
 
 func (h *Header) Decode(data []byte) error {
+	if len(data) < 12 {
+		return ErrHeaderTooShort
+	}
+	n, err := binary.Decode(data, binary.BigEndian, h)
+	if err != nil {
+		return err
+	}
+	if n < 12 {
+		return ErrHeaderTooShort
+	}
 	return nil
 }
 
 // Flags is the unpacked representation of the 16-bit flags field in Header.
 // Each bit (or group of bits) controls DNS protocol behavior.
-// Use Pack() to serialize into a uint16, and Unpack() to parse one back.
+// Use Encode() to serialize into a uint16, and Decode() to parse one back.
 //
 // Bit layout (RFC 1035, Section 4.1.1):
 //
-//	                                  1  1  1  1  1  1
-//	    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-//		+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//		|QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-//		+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	                                1  1  1  1  1  1
+//	  0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+//	|QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+//	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 //
-// Reference: RFC 1035, Section 4.1.1
+// Reference: RFC 1035, Section 4.1.1 (Header section format)
 // https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1
 type Flags struct {
 	// QR (1 bit) — Query/Response.
