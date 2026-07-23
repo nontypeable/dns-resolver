@@ -90,7 +90,9 @@ type Header struct {
 
 func (h Header) Encode() []byte {
 	buf := make([]byte, 12)
-	binary.Encode(buf, binary.BigEndian, h)
+	if _, err := binary.Encode(buf, binary.BigEndian, h); err != nil {
+		panic(err)
+	}
 	return buf
 }
 
@@ -98,14 +100,8 @@ func (h *Header) Decode(data []byte) error {
 	if len(data) < 12 {
 		return ErrHeaderTooShort
 	}
-	n, err := binary.Decode(data, binary.BigEndian, h)
-	if err != nil {
-		return err
-	}
-	if n < 12 {
-		return ErrHeaderTooShort
-	}
-	return nil
+	_, err := binary.Decode(data, binary.BigEndian, h)
+	return err
 }
 
 // Flags is the unpacked representation of the 16-bit flags field in Header.
