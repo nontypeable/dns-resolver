@@ -133,6 +133,63 @@ func encodeName(name string) ([]byte, error) {
 	return result, nil
 }
 
+// TODO: refactor this function
 func decodeName(data []byte, offset int) (name string, newOffset int, err error) {
-	return "", offset, nil
+	pos := offset
+
+	r := make([]string, 0)
+
+	jumped := false
+	returnOffset := 0
+
+	for {
+		if 0xC0 <= data[pos] && data[pos] <= 0xFF {
+			if !jumped {
+				returnOffset = pos + 2
+				jumped = true
+			}
+
+			if pos+1 >= len(data) {
+				return "", 0, ErrNameTruncated
+			}
+
+			// Extract the 14-bit offset from the pointer:
+			// 0x3F = 0b00111111, strips the 2-bit pointer flag,
+			// leaving only the offset bits.
+			target := int(data[pos]&0x3F)<<8 | int(data[pos+1])
+
+			if target >= pos {
+				return "", 0, ErrInvalidPointer
+			}
+
+			if target >= len(data) {
+				return "", 0, ErrInvalidPointer
+			}
+
+			pos = target
+
+			continue
+		}
+
+		length := int(data[pos])
+		if length == 0 {
+			pos++
+			break
+		}
+		if pos+1+length > len(data) {
+			return "", 0, ErrNameTruncated
+		}
+
+		label := data[pos+1 : pos+1+length]
+		r = append(r, string(label))
+		pos += 1 + length
+	}
+
+	name = strings.Join(r, ".")
+
+	if jumped {
+		return name, returnOffset, nil
+	}
+
+	return name, pos, nil
 }
