@@ -105,7 +105,21 @@ type ResourceRecord struct {
 // name (empty label, label or name too long) returns the same errors as
 // Question.Encode.
 func (r ResourceRecord) Encode() ([]byte, error) {
-	return nil, nil
+	encodedName, err := encodeName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	var buf []byte
+
+	buf = append(buf, encodedName...)
+	buf = binary.BigEndian.AppendUint16(buf, r.Type)
+	buf = binary.BigEndian.AppendUint16(buf, r.Class)
+	buf = binary.BigEndian.AppendUint32(buf, r.TTL)
+	buf = binary.BigEndian.AppendUint16(buf, r.RDLENGTH)
+	buf = append(buf, r.RDATA...)
+
+	return buf, nil
 }
 
 // Decode parses a single resource record starting at offset in data and
@@ -120,5 +134,28 @@ func (r ResourceRecord) Encode() ([]byte, error) {
 //   - ErrRdataTruncated if RDLENGTH exceeds the remaining bytes.
 //   - name errors from decodeName (ErrNameTruncated, ErrInvalidPointer, ...).
 func (r *ResourceRecord) Decode(data []byte, offset int) (int, error) {
-	return 0, nil
+	name, newOffset, err := decodeName(data, offset)
+	if err != nil {
+		return 0, err
+	}
+
+	// TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) = 10 fixed bytes after the name.
+	if len(data)-newOffset < 10 {
+		return 0, ErrResourceRecordTooShort
+	}
+
+	r.Name = name
+	r.Type = binary.BigEndian.Uint16(data[newOffset : newOffset+2])
+	r.Class = binary.BigEndian.Uint16(data[newOffset+2 : newOffset+4])
+	r.TTL = binary.BigEndian.Uint32(data[newOffset+4 : newOffset+8])
+
+	r.RDLENGTH = binary.BigEndian.Uint16(data[newOffset+8 : newOffset+10])
+	rdlength := int(r.RDLENGTH)
+	rdataStart := newOffset + 10
+	if len(data)-rdataStart < rdlength {
+		return 0, ErrRdataTruncated
+	}
+	r.RDATA = data[rdataStart : rdataStart+rdlength]
+
+	return rdataStart + rdlength, nil
 }
