@@ -2,7 +2,6 @@ package dns
 
 import (
 	"encoding/binary"
-	"log"
 	"strings"
 )
 
@@ -104,12 +103,10 @@ func (q Question) Encode() ([]byte, error) {
 	}
 
 	result := make([]byte, 4+len(encodedName))
-	log.Printf("result: %+v", result)
 
 	copy(result[0:len(encodedName)], encodedName)
-	log.Printf("result: %+v", result)
-
-	binary.Encode(result[len(encodedName):], binary.BigEndian, ([]uint16{q.Type, q.Class}))
+	binary.BigEndian.PutUint16(result[len(encodedName):], q.Type)
+	binary.BigEndian.PutUint16(result[len(encodedName)+2:], q.Class)
 
 	return result, nil
 }
@@ -125,15 +122,8 @@ func (q *Question) Decode(data []byte, offset int) (int, error) {
 	}
 
 	q.Name = name
-	_, err = binary.Decode(data[newOffset:newOffset+2], binary.BigEndian, &q.Type)
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = binary.Decode(data[newOffset+2:newOffset+4], binary.BigEndian, &q.Class)
-	if err != nil {
-		return 0, err
-	}
+	q.Type = binary.BigEndian.Uint16(data[newOffset : newOffset+2])
+	q.Class = binary.BigEndian.Uint16(data[newOffset+2 : newOffset+4])
 
 	return newOffset + 4, nil
 }
