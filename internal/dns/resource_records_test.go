@@ -15,7 +15,7 @@ func TestResourceRecordEncode_Basic(t *testing.T) {
 	}{
 		{
 			"root A IN with 4-byte RDATA",
-			ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
+			ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
 			[]byte{
 				0x00,       // NAME = root
 				0x00, 0x01, // TYPE = A
@@ -27,7 +27,7 @@ func TestResourceRecordEncode_Basic(t *testing.T) {
 		},
 		{
 			"www.example.com A IN",
-			ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
+			ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
 			[]byte{
 				0x03, 'w', 'w', 'w',
 				0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e',
@@ -43,11 +43,12 @@ func TestResourceRecordEncode_Basic(t *testing.T) {
 		{
 			"example.com AAAA IN with 16-byte RDATA",
 			ResourceRecord{
-				Name:  "example.com",
-				Type:  AAAA,
-				Class: IN,
-				TTL:   3600,
-				RDATA: []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01},
+				Name:     "example.com",
+				Type:     AAAA,
+				Class:    IN,
+				TTL:      3600,
+				RDLENGTH: 16,
+				RDATA:    []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01},
 			},
 			[]byte{
 				0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e',
@@ -62,7 +63,7 @@ func TestResourceRecordEncode_Basic(t *testing.T) {
 		},
 		{
 			"max TTL, type and class",
-			ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDATA: []byte{0xAA, 0xBB}},
+			ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDLENGTH: 2, RDATA: []byte{0xAA, 0xBB}},
 			[]byte{
 				0x03, 'c', 'o', 'm', 0x00,
 				0xFF, 0xFF, // TYPE
@@ -74,7 +75,7 @@ func TestResourceRecordEncode_Basic(t *testing.T) {
 		},
 		{
 			"empty RDATA encodes RDLENGTH zero",
-			ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDATA: []byte{}},
+			ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDLENGTH: 0, RDATA: []byte{}},
 			[]byte{
 				0x03, 'c', 'o', 'm', 0x00,
 				0x00, 0x02, // TYPE = NS
@@ -134,7 +135,7 @@ func TestResourceRecordDecode_Basic(t *testing.T) {
 				0x5D, 0xB8, 0xD8, 0x22, // RDATA
 			},
 			0,
-			ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
+			ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
 			15,
 		},
 		{
@@ -151,7 +152,7 @@ func TestResourceRecordDecode_Basic(t *testing.T) {
 				0x5D, 0xB8, 0xD8, 0x22, // RDATA
 			},
 			0,
-			ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
+			ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}},
 			31,
 		},
 		{
@@ -165,7 +166,7 @@ func TestResourceRecordDecode_Basic(t *testing.T) {
 				0xAA, 0xBB, // RDATA
 			},
 			0,
-			ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDATA: []byte{0xAA, 0xBB}},
+			ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDLENGTH: 2, RDATA: []byte{0xAA, 0xBB}},
 			17,
 		},
 		{
@@ -178,7 +179,7 @@ func TestResourceRecordDecode_Basic(t *testing.T) {
 				0x00, 0x00, // RDLENGTH = 0
 			},
 			0,
-			ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDATA: []byte{}},
+			ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDLENGTH: 0, RDATA: []byte{}},
 			15,
 		},
 	}
@@ -289,12 +290,12 @@ func TestResourceRecordRoundTrip(t *testing.T) {
 		name   string
 		record ResourceRecord
 	}{
-		{"root A IN", ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}}},
-		{"www.example.com A IN", ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}}},
-		{"example.com AAAA IN", ResourceRecord{Name: "example.com", Type: AAAA, Class: IN, TTL: 3600, RDATA: []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}}},
-		{"example.com MX IN", ResourceRecord{Name: "example.com", Type: MX, Class: IN, TTL: 600, RDATA: []byte{0x00, 0x0A, 0x03, 'm', 'a', 'i', 0x00}}},
-		{"max TTL, type and class", ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDATA: []byte{0xAA, 0xBB}}},
-		{"empty RDATA", ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDATA: []byte{}}},
+		{"root A IN", ResourceRecord{Name: "", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}}},
+		{"www.example.com A IN", ResourceRecord{Name: "www.example.com", Type: A, Class: IN, TTL: 300, RDLENGTH: 4, RDATA: []byte{0x5D, 0xB8, 0xD8, 0x22}}},
+		{"example.com AAAA IN", ResourceRecord{Name: "example.com", Type: AAAA, Class: IN, TTL: 3600, RDLENGTH: 16, RDATA: []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}}},
+		{"example.com MX IN", ResourceRecord{Name: "example.com", Type: MX, Class: IN, TTL: 600, RDLENGTH: 7, RDATA: []byte{0x00, 0x0A, 0x03, 'm', 'a', 'i', 0x00}}},
+		{"max TTL, type and class", ResourceRecord{Name: "com", Type: 0xFFFF, Class: 0xFFFF, TTL: 0xFFFFFFFF, RDLENGTH: 2, RDATA: []byte{0xAA, 0xBB}}},
+		{"empty RDATA", ResourceRecord{Name: "com", Type: NS, Class: IN, TTL: 0, RDLENGTH: 0, RDATA: []byte{}}},
 	}
 
 	for _, tt := range tests {

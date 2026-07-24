@@ -1,5 +1,9 @@
 package dns
 
+import (
+	"encoding/binary"
+)
+
 // ResourceRecord is a single entry in the Answer, Authority, or Additional
 // section of a DNS message (collectively called "resource records", or RRs).
 //
@@ -41,8 +45,9 @@ package dns
 // Encode writes the name uncompressed (a valid, if not maximally compact,
 // encoding). See RFC 1035, Section 4.1.4 for the compression scheme.
 //
-// RDLENGTH is not stored as a field: on Encode it is derived as len(RDATA);
-// on Decode it is read off the wire to know how many RDATA bytes to consume.
+// RDLENGTH is the number of bytes in RDATA. It is a stored field: on Encode
+// it is written as-is (the caller must set it to len(RDATA)); on Decode it is
+// read off the wire and used to know how many RDATA bytes to consume.
 //
 // Reference: RFC 1035, Section 4.1.3 (Resource record format)
 // https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3
@@ -68,6 +73,13 @@ type ResourceRecord struct {
 	// record is considered expired.
 	// Stored as a 32-bit big-endian value.
 	TTL uint32
+
+	// RDLENGTH is the number of bytes in RDATA. It is a stored field: on Encode
+	// it is written as-is rather than derived, so the caller must keep it in
+	// sync with len(RDATA). On Decode it is read from the wire and used to bound
+	// the RDATA slice that follows.
+	// Stored as a 16-bit big-endian value.
+	RDLENGTH uint16
 
 	// RDATA is the type-specific payload of the record, as raw bytes.
 	// Its interpretation depends on Type:
