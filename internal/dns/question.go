@@ -168,28 +168,30 @@ func encodeName(name string) ([]byte, error) {
 	return result, nil
 }
 
-// TODO: refactor this function
 func decodeName(data []byte, offset int) (name string, newOffset int, err error) {
-	if len(data) == 0 {
+	if offset >= len(data) {
 		return "", 0, ErrNameTruncated
 	}
 
+	labels := make([]string, 0)
+
 	pos := offset
-
-	r := make([]string, 0)
-
-	jumped := false
-	returnOffset := 0
+	nextOffset := -1
 
 	for {
-		if 0xC0 <= data[pos] && data[pos] <= 0xFF {
-			if !jumped {
-				returnOffset = pos + 2
-				jumped = true
-			}
+		if offset >= len(data) {
+			return "", 0, ErrNameTruncated
+		}
 
+		b := data[pos]
+
+		if (b & 0xC0) == 0xC0 {
 			if pos+1 >= len(data) {
 				return "", 0, ErrNameTruncated
+			}
+
+			if nextOffset == -1 {
+				nextOffset = pos + 2
 			}
 
 			// Extract the 14-bit offset from the pointer:
@@ -206,28 +208,32 @@ func decodeName(data []byte, offset int) (name string, newOffset int, err error)
 			}
 
 			pos = target
-
 			continue
 		}
 
-		length := int(data[pos])
+		if b&0xC0 != 0 {
+			return "", 0, ErrInvalidPointer
+		}
+
+		length := int(b)
+
 		if length == 0 {
 			pos++
 			break
 		}
+
 		if pos+1+length > len(data) {
 			return "", 0, ErrNameTruncated
 		}
 
-		label := data[pos+1 : pos+1+length]
-		r = append(r, string(label))
+		labels = append(labels, string(data[pos+1:pos+1+length]))
 		pos += 1 + length
 	}
 
-	name = strings.Join(r, ".")
+	name = strings.Join(labels, ".")
 
-	if jumped {
-		return name, returnOffset, nil
+	if nextOffset != -1 {
+		return name, nextOffset, nil
 	}
 
 	return name, pos, nil
